@@ -143,7 +143,7 @@ main { padding-block: 18px 30px; display: grid; gap: 26px; }
     <span><i class="dot ok"></i> בסדר: אוכלת, לא מתלהבת</span>
     <span><i class="dot no"></i> לא: לא בתפריט שלי</span>
   </div>
-  <p class="galnote"><span class="galtag">גם בתפריט של גל</span> מסמן מאכלים שכבר נמצאים בתפריט של גל. כל מה שמשותף אפשר לקנות ולבשל ביחד.</p>
+  <p class="galnote"><span class="galtag">גם בתפריט של גל</span> מסמן מאכלים שכבר נמצאים בתפריט של גל.</p>
 </div>
 
 <div class="bar">
@@ -253,7 +253,7 @@ function renderGroups() {
     <section class="group" aria-labelledby="g-${g.id}">
       <header>
         <h2 id="g-${g.id}">${g.title}</h2>
-        <button class="allok" type="button" data-allok="${g.id}">סמני את הנותרים כ״בסדר״</button>
+        <button class="allok" type="button" data-allok="${g.id}">לחצי פה כדי לסמן את הנותרים ב״בסדר״</button>
         ${g.hint ? `<p class="hint">${g.hint}</p>` : ""}
       </header>
       <div class="items">
