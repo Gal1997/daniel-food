@@ -29,6 +29,8 @@
   --no-soft: #f8e6e3;
   --gal: #8a5410;
   --gal-soft: #fbf0dd;
+  --confetti-gold: #f2b705;
+  --scrim: rgba(12, 22, 17, 0.5);
   --font-display: "Rubik", "Segoe UI", system-ui, sans-serif;
   --font-body: "Assistant", "Segoe UI", system-ui, -apple-system, sans-serif;
 }
@@ -126,7 +128,37 @@ main { padding-block: 18px 30px; display: grid; gap: 26px; }
 .send { padding-block: 0 40px; display: grid; gap: 10px; justify-items: start; }
 .send p { color: var(--muted); max-width: 60ch; }
 
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+/* Celebration after copying */
+.party {
+  position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
+  background: var(--scrim);
+  padding-block: max(24px, env(safe-area-inset-top, 0px)) max(24px, env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.party canvas { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 52; }
+.party-card {
+  position: relative; z-index: 51; width: min(420px, 100%);
+  background: var(--surface); color: var(--fg); border: 2px solid var(--accent);
+  border-radius: 22px; padding: 28px 22px 22px; text-align: center; display: grid; gap: 12px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .25);
+  animation: pop .7s cubic-bezier(.2, 1.6, .4, 1) both;
+}
+.party-emoji { font-size: 54px; line-height: 1; display: inline-block; animation: wiggle .5s ease-in-out infinite alternate; }
+.party-card h2 { font-size: clamp(30px, 8vw, 38px); color: var(--accent); line-height: 1.1; }
+.party-card p { font-size: 18.5px; line-height: 1.45; }
+.party-card .btn { justify-self: center; font-size: 17px; padding: 11px 22px; margin-top: 4px; }
+@keyframes pop {
+  0% { transform: scale(.3) rotate(-10deg); opacity: 0; }
+  60% { transform: scale(1.08) rotate(3deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); }
+}
+@keyframes wiggle { from { transform: rotate(-14deg) scale(1); } to { transform: rotate(14deg) scale(1.15); } }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+  .party-card, .party-emoji { animation: none; }
+}
 @media (max-width: 420px) {
   .seg button { min-width: 46px; padding: 6px 8px; }
   .items { grid-template-columns: 1fr; }
@@ -181,6 +213,16 @@ main { padding-block: 18px 30px; display: grid; gap: 26px; }
   </div>
   <button class="btn ghost" id="resetBtn" type="button">ניקוי כל התשובות</button>
   <p id="resetConfirm" hidden>בטוחה? <button class="btn ghost" id="resetYes" type="button">כן, לנקות</button> <button class="btn ghost" id="resetNo" type="button">ביטול</button></p>
+</div>
+
+<div class="party" id="party" hidden role="dialog" aria-modal="true" aria-labelledby="partyTitle">
+  <canvas id="partyCanvas" aria-hidden="true"></canvas>
+  <div class="party-card">
+    <div><span class="party-emoji" aria-hidden="true">🎉</span></div>
+    <h2 id="partyTitle">כל הכבוד מתוקית</h2>
+    <p>עכשיו נשאר רק להדביק לגל בוצאפ את התשובות</p>
+    <button class="btn" id="partyClose" type="button">יאללה, שולחת!</button>
+  </div>
 </div>
 
 <script>
@@ -375,12 +417,99 @@ function copyAnswers(btn) {
   try {
     navigator.clipboard.writeText(text).then(() => {
       box.hidden = true;
+      celebrate();
       clearTimeout(btn._t);
       btn.textContent = "הועתק. אפשר להדביק בוואטסאפ";
       btn._t = setTimeout(() => { btn.textContent = "העתקת התשובות"; }, 2200);
     }).catch(fallback);
   } catch (err) { fallback(); }
 }
+// When the clipboard is blocked she copies from the text box by hand; celebrate then too.
+document.getElementById("copyText").addEventListener("copy", () => setTimeout(celebrate, 150));
+
+const party = document.getElementById("party");
+const partyCanvas = document.getElementById("partyCanvas");
+let partyRaf = 0, lastFocus = null;
+
+function celebrate() {
+  if (!party.hidden) return;
+  lastFocus = document.activeElement;
+  party.hidden = false;
+  document.getElementById("partyClose").focus({ preventScroll: true });
+  try { navigator.vibrate && navigator.vibrate([60, 40, 60]); } catch (e) {}
+  if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) confetti();
+}
+function closeParty() {
+  party.hidden = true;
+  cancelAnimationFrame(partyRaf);
+  const ctx = partyCanvas.getContext("2d");
+  ctx.clearRect(0, 0, partyCanvas.width, partyCanvas.height);
+  if (lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true });
+}
+document.getElementById("partyClose").addEventListener("click", closeParty);
+party.addEventListener("click", e => { if (e.target === party) closeParty(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !party.hidden) closeParty(); });
+
+function confetti() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const W = window.innerWidth, H = window.innerHeight;
+  partyCanvas.width = W * dpr; partyCanvas.height = H * dpr;
+  const ctx = partyCanvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const css = getComputedStyle(document.documentElement);
+  const colors = ["--accent", "--ok", "--no", "--gal", "--confetti-gold"].map(v => css.getPropertyValue(v).trim());
+  const foods = ["🥦", "🍓", "🥑", "🍗", "🍌", "🥗", "🍎", "🥚", "🫐", "🍫"];
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const bits = [];
+  // Two cannons from the bottom corners
+  for (let i = 0; i < 150; i++) {
+    const left = i % 2 === 0;
+    bits.push({
+      x: left ? -10 : W + 10, y: H * 0.85,
+      vx: (left ? 1 : -1) * rnd(4, 11), vy: rnd(-19, -10),
+      r: rnd(0, Math.PI * 2), vr: rnd(-0.3, 0.3),
+      w: rnd(6, 11), h: rnd(9, 16), c: colors[i % colors.length], delay: rnd(0, 25)
+    });
+  }
+  // Food raining from the top
+  for (let i = 0; i < 26; i++) {
+    bits.push({
+      x: rnd(0, W), y: rnd(-H * 0.6, -30), vx: rnd(-1, 1), vy: rnd(1, 3),
+      r: rnd(-0.5, 0.5), vr: rnd(-0.06, 0.06), emoji: foods[i % foods.length], size: rnd(24, 38), delay: rnd(0, 60)
+    });
+  }
+  let frame = 0;
+  const tick = () => {
+    frame++;
+    ctx.clearRect(0, 0, W, H);
+    let alive = 0;
+    for (const b of bits) {
+      if (frame < b.delay) { alive++; continue; }
+      b.vy += b.emoji ? 0.08 : 0.32;
+      b.vx *= 0.99;
+      b.x += b.vx; b.y += b.vy; b.r += b.vr;
+      if (b.y > H + 60) continue;
+      alive++;
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.r);
+      if (b.emoji) {
+        ctx.font = `${b.size}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(b.emoji, 0, 0);
+      } else {
+        ctx.fillStyle = b.c;
+        ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h * Math.abs(Math.cos(frame / 6 + b.r)));
+      }
+      ctx.restore();
+    }
+    if (alive && frame < 600) partyRaf = requestAnimationFrame(tick);
+    else ctx.clearRect(0, 0, W, H);
+  };
+  cancelAnimationFrame(partyRaf);
+  partyRaf = requestAnimationFrame(tick);
+}
+
 document.getElementById("copyTop").addEventListener("click", e => copyAnswers(e.currentTarget));
 document.getElementById("copyBottom").addEventListener("click", e => copyAnswers(e.currentTarget));
 
