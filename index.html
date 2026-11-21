@@ -5,11 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <title>מה את מוכנה לאכול?</title>
-<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
-</head>
-<body>
-<meta name="claude:viewport-fit-sides" content="cover">
-<script>document.documentElement.lang = "he"; document.documentElement.dir = "rtl";</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@600;700&family=Assistant:wght@400;500;600;700&display=swap">
@@ -51,6 +46,7 @@
 
 * { box-sizing: border-box; }
 body {
+  margin: 0;
   direction: rtl; background: var(--bg); color: var(--fg);
   font-family: var(--font-body); font-size: 16px; line-height: 1.55;
   font-variant-numeric: tabular-nums;
@@ -129,6 +125,7 @@ main { padding-block: 18px 30px; display: grid; gap: 26px; }
 .send p { color: var(--muted); max-width: 60ch; }
 
 /* Celebration after copying */
+[hidden] { display: none !important; }
 .party {
   position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
   background: var(--scrim);
@@ -159,6 +156,11 @@ main { padding-block: 18px 30px; display: grid; gap: 26px; }
   * { transition: none !important; }
   .party-card, .party-emoji { animation: none; }
 }
+@media (pointer: coarse) {
+  .seg button, .chip, .allok { min-height: 44px; }
+  .q textarea { font-size: 16px; }
+}
+html:has(.party:not([hidden])) { overflow: hidden; }
 @media (max-width: 420px) {
   .seg button { min-width: 46px; padding: 6px 8px; }
   .items { grid-template-columns: 1fr; }
@@ -166,6 +168,8 @@ main { padding-block: 18px 30px; display: grid; gap: 26px; }
   .counts { gap: 8px; }
 }
 </style>
+</head>
+<body>
 
 <div class="wrap intro">
   <h1>מה את מוכנה לאכול?</h1>
@@ -218,9 +222,9 @@ main { padding-block: 18px 30px; display: grid; gap: 26px; }
 <div class="party" id="party" hidden role="dialog" aria-modal="true" aria-labelledby="partyTitle">
   <canvas id="partyCanvas" aria-hidden="true"></canvas>
   <div class="party-card">
-    <div><span class="party-emoji" aria-hidden="true">🎉</span></div>
+    <div><span class="party-emoji" id="partyEmoji" aria-hidden="true">🎉</span></div>
     <h2 id="partyTitle">כל הכבוד מתוקית</h2>
-    <p>עכשיו נשאר רק להדביק לגל בוצאפ את התשובות</p>
+    <p id="partyText">עכשיו נשאר רק להדביק לגל בוצאפ את התשובות</p>
     <button class="btn" id="partyClose" type="button">יאללה, שולחת!</button>
   </div>
 </div>
@@ -286,7 +290,10 @@ const STORE_KEY = "food-survey-v1";
 
 let state = { a: {}, q: {}, t: {} };
 try { const raw = localStorage.getItem(STORE_KEY); if (raw) state = Object.assign(state, JSON.parse(raw)); } catch (e) {}
-function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} }
+function save() {
+  document.getElementById("copyBox").hidden = true;
+  document.getElementById("copyText").value = "";
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} }
 
 const keyOf = (g, name) => g.id + ":" + name;
 const total = GROUPS.reduce((n, g) => n + g.items.length, 0);
@@ -300,6 +307,12 @@ function renderGroups() {
         ${g.hint ? `<p class="hint">${g.hint}</p>` : ""}
       </header>
       <div class="items">
+        ${g.id === "snacks" ? `<div class="item">
+            <span class="name">את עצמך 😏<br><span class="galtag">גם בתפריט של גל</span></span>
+            <span class="seg" role="group" aria-label="את עצמך">
+              ${["love", "ok", "no"].map(v => `<button type="button" data-joke="1" data-v="${v}" aria-pressed="false">${LABELS[v]}</button>`).join("")}
+            </span>
+          </div>` : ""}
         ${g.items.map(name => {
           const k = keyOf(g, name);
           return `<div class="item" data-k="${k}">
@@ -345,6 +358,7 @@ function sync() {
 document.getElementById("groups").addEventListener("click", e => {
   const b = e.target.closest("button");
   if (!b) return;
+  if (b.dataset.joke) { joke(); return; }
   if (b.dataset.allok) {
     const g = GROUPS.find(x => x.id === b.dataset.allok);
     g.items.forEach(name => { const k = keyOf(g, name); if (!state.a[k]) state.a[k] = "ok"; });
@@ -366,14 +380,13 @@ document.querySelector(".questions").addEventListener("click", e => {
   state.q[q] = sel;
   save(); sync();
 });
-let tTimer;
 document.querySelector(".questions").addEventListener("input", e => {
   const ta = e.target.closest("textarea[data-t]");
   if (!ta) return;
   state.t[ta.dataset.t] = ta.value;
-  clearTimeout(tTimer); tTimer = setTimeout(save, 400);
+  save();
 });
-document.querySelector(".questions").addEventListener("change", () => { clearTimeout(tTimer); save(); });
+
 
 function summary() {
   const by = { love: [], ok: [], no: [] };
@@ -405,7 +418,7 @@ function summary() {
 }
 
 function copyAnswers(btn) {
-  clearTimeout(tTimer); save();
+  save();
   const text = summary();
   const box = document.getElementById("copyBox");
   const fallback = () => {
@@ -431,13 +444,26 @@ const party = document.getElementById("party");
 const partyCanvas = document.getElementById("partyCanvas");
 let partyRaf = 0, lastFocus = null;
 
-function celebrate() {
+function showParty(o) {
   if (!party.hidden) return;
+  document.getElementById("partyEmoji").textContent = o.emoji;
+  document.getElementById("partyTitle").textContent = o.title;
+  const description = document.getElementById("partyText");
+  description.hidden = !o.text;
+  description.textContent = o.text || "";
+  document.getElementById("partyClose").textContent = o.btn;
   lastFocus = document.activeElement;
   party.hidden = false;
   document.getElementById("partyClose").focus({ preventScroll: true });
-  try { navigator.vibrate && navigator.vibrate([60, 40, 60]); } catch (e) {}
-  if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) confetti();
+  try { navigator.vibrate && navigator.vibrate(o.buzz); } catch (e) {}
+  if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) confetti(o.kind);
+}
+function celebrate() {
+  showParty({ emoji: "🎉", title: "כל הכבוד מתוקית", text: "עכשיו נשאר רק להדביק לגל בוצאפ את התשובות", btn: "יאללה, שולחת!", kind: "confetti", buzz: [60, 40, 60] });
+}
+// The joke row in snacks: never saved, never counted, never copied.
+function joke() {
+  showParty({ emoji: "😏", title: "המנה הזאת שמורה לגל", btn: "אוף, טוב", kind: "hearts", buzz: [30, 30, 30, 30, 120] });
 }
 function closeParty() {
   party.hidden = true;
@@ -448,9 +474,14 @@ function closeParty() {
 }
 document.getElementById("partyClose").addEventListener("click", closeParty);
 party.addEventListener("click", e => { if (e.target === party) closeParty(); });
-document.addEventListener("keydown", e => { if (e.key === "Escape" && !party.hidden) closeParty(); });
+document.addEventListener("keydown", e => { if (party.hidden) return;
+  if (e.key === "Escape") closeParty();
+  if (e.key === "Tab") {
+    e.preventDefault();
+    document.getElementById("partyClose").focus();
+  } });
 
-function confetti() {
+function confetti(kind) {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const W = window.innerWidth, H = window.innerHeight;
   partyCanvas.width = W * dpr; partyCanvas.height = H * dpr;
@@ -461,8 +492,19 @@ function confetti() {
   const foods = ["🥦", "🍓", "🥑", "🍗", "🍌", "🥗", "🍎", "🥚", "🫐", "🍫"];
   const rnd = (a, b) => a + Math.random() * (b - a);
   const bits = [];
+  if (kind === "hearts") {
+    // Hearts and kisses floating up from the bottom
+    const love = ["❤️", "😘", "💋", "😍", "💕", "🔥", "😏"];
+    for (let i = 0; i < 22; i++) {
+      bits.push({
+        x: rnd(0, W), y: H + rnd(20, H * 0.5), vx: rnd(-0.6, 0.6), vy: rnd(-6, -3), float: true,
+        sway: rnd(0, Math.PI * 2), r: rnd(-0.3, 0.3), vr: rnd(-0.02, 0.02),
+        emoji: love[i % love.length], size: rnd(24, 44), delay: rnd(0, 50)
+      });
+    }
+  } else
   // Two cannons from the bottom corners
-  for (let i = 0; i < 150; i++) {
+  for (let i = 0; i < 76; i++) {
     const left = i % 2 === 0;
     bits.push({
       x: left ? -10 : W + 10, y: H * 0.85,
@@ -472,31 +514,52 @@ function confetti() {
     });
   }
   // Food raining from the top
-  for (let i = 0; i < 26; i++) {
+  if (kind !== "hearts") for (let i = 0; i < 12; i++) {
     bits.push({
       x: rnd(0, W), y: rnd(-H * 0.6, -30), vx: rnd(-1, 1), vy: rnd(1, 3),
       r: rnd(-0.5, 0.5), vr: rnd(-0.06, 0.06), emoji: foods[i % foods.length], size: rnd(24, 38), delay: rnd(0, 60)
     });
   }
-  let frame = 0;
-  const tick = () => {
-    frame++;
+  // Paint each glyph once, then animate copies of the bitmap.
+  const sprites = new Map();
+  for (const { emoji } of bits) {
+    if (!emoji || sprites.has(emoji)) continue;
+    const sprite = document.createElement("canvas");
+    sprite.width = sprite.height = Math.ceil(64 * dpr);
+    const brush = sprite.getContext("2d");
+    brush.scale(dpr, dpr);
+    brush.font = '48px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+    brush.textAlign = "center";
+    brush.textBaseline = "middle";
+    brush.fillText(emoji, 32, 32);
+    sprites.set(emoji, sprite);
+  }
+  let frame = 0, previousTime;
+  const tick = now => {
+    const step = previousTime === undefined ? 1 : Math.min((now - previousTime) * 0.06, 3);
+    previousTime = now;
+    frame += step;
     ctx.clearRect(0, 0, W, H);
     let alive = 0;
     for (const b of bits) {
       if (frame < b.delay) { alive++; continue; }
-      b.vy += b.emoji ? 0.08 : 0.32;
-      b.vx *= 0.99;
-      b.x += b.vx; b.y += b.vy; b.r += b.vr;
-      if (b.y > H + 60) continue;
+      if (b.float) {
+        b.sway += 0.05 * step;
+        b.x += (b.vx + Math.sin(b.sway) * 1.2) * step; b.y += b.vy * step; b.r += b.vr * step;
+        if (b.y < -60) continue;
+      } else {
+        b.vy += (b.emoji ? 0.08 : 0.32) * step;
+        b.vx *= 0.99 ** step;
+        b.x += b.vx * step; b.y += b.vy * step; b.r += b.vr * step;
+        if (b.y > H + 60) continue;
+      }
       alive++;
       ctx.save();
       ctx.translate(b.x, b.y);
       ctx.rotate(b.r);
       if (b.emoji) {
-        ctx.font = `${b.size}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
-        ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        ctx.fillText(b.emoji, 0, 0);
+        const side = b.size * 64 / 48;
+        ctx.drawImage(sprites.get(b.emoji), -side / 2, -side / 2, side, side);
       } else {
         ctx.fillStyle = b.c;
         ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h * Math.abs(Math.cos(frame / 6 + b.r)));
@@ -525,6 +588,5 @@ renderGroups();
 renderQuestions();
 sync();
 </script>
-
 </body>
 </html>
