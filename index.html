@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>מה את מוכנה לאכול?</title>
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<meta name="claude:viewport-fit-sides" content="cover">
+<script>document.documentElement.lang = "he"; document.documentElement.dir = "rtl";</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@600;700&family=Assistant:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: sticky progress bar, then one block per food group; each food is a row with a 3-way answer switch. Right-to-left. */
+:root {
+  --bg: #f4f7f5;
+  --surface: #ffffff;
+  --fg: #16201b;
+  --muted: #5a6a62;
+  --line: #d9e2dd;
+  --accent: #1d7a58;
+  --accent-soft: #e4f2ec;
+  --ok: #3d5bd9;
+  --ok-soft: #e6eafb;
+  --no: #b93a2c;
+  --no-soft: #f8e6e3;
+  --gal: #8a5410;
+  --gal-soft: #fbf0dd;
+  --font-display: "Rubik", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Assistant", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1412; --surface: #161f1b; --fg: #e4ece8; --muted: #93a49b; --line: #2a3530;
+    --accent: #52c49b; --accent-soft: #183229; --ok: #93a6ff; --ok-soft: #1f2645;
+    --no: #f07a6a; --no-soft: #3a1e1a; --gal: #e8b25c; --gal-soft: #33260f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1412; --surface: #161f1b; --fg: #e4ece8; --muted: #93a49b; --line: #2a3530;
+  --accent: #52c49b; --accent-soft: #183229; --ok: #93a6ff; --ok-soft: #1f2645;
+  --no: #f07a6a; --no-soft: #3a1e1a; --gal: #e8b25c; --gal-soft: #33260f;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  direction: rtl; background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.55;
+  font-variant-numeric: tabular-nums;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap {
+  max-width: 1000px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(28px, 6vw, 40px); line-height: 1.12; }
+h2 { font-size: 20px; line-height: 1.25; }
+p { margin: 0; }
+.muted { color: var(--muted); }
+
+.intro { padding-block: 28px 18px; display: grid; gap: 12px; }
+.intro .lede { max-width: 60ch; color: var(--muted); font-size: 17px; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 15px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.dot.love { background: var(--accent); } .dot.ok { background: var(--ok); } .dot.no { background: var(--no); }
+
+/* Sticky progress */
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+.bar .wrap { padding-block: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+.progress { flex: 1 1 160px; min-width: 0; display: grid; gap: 4px; }
+.progress .row { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; }
+.progress .row b { font-family: var(--font-display); font-size: 17px; }
+.track { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.track .fill { height: 100%; width: 0; background: var(--accent); border-radius: 999px; transition: width .2s ease; }
+.counts { display: flex; gap: 12px; font-size: 14px; color: var(--muted); }
+.counts span { display: inline-flex; align-items: center; gap: 5px; }
+button { font: inherit; cursor: pointer; }
+.btn { font-size: 15px; font-weight: 600; padding: 9px 16px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: var(--surface); }
+.btn.ghost { background: var(--surface); color: var(--fg); border-color: var(--line); }
+.btn:focus-visible, .seg button:focus-visible, .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.copybox { width: 100%; display: grid; gap: 6px; }
+.copybox textarea { width: 100%; min-height: 140px; font: inherit; font-size: 14px; padding: 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); }
+
+/* Groups */
+main { padding-block: 18px 30px; display: grid; gap: 26px; }
+.group { display: grid; gap: 10px; }
+.group header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 12px; }
+.group header .hint { font-size: 14.5px; color: var(--muted); flex-basis: 100%; }
+.group .allok { font-size: 14px; font-weight: 600; background: none; border: none; color: var(--ok); padding: 4px 0; }
+.items { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 8px; }
+.item {
+  min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px 8px 8px;
+}
+.item[data-v="love"] { border-color: var(--accent); }
+.item[data-v="ok"] { border-color: var(--ok); }
+.item[data-v="no"] { border-color: var(--no); opacity: .75; }
+.item .name { min-width: 0; font-size: 15.5px; font-weight: 500; }
+.item .name small { display: block; font-size: 13px; color: var(--muted); font-weight: 400; }
+.galtag { display: inline-block; font-size: 12.5px; font-weight: 600; color: var(--gal); background: var(--gal-soft); border-radius: 999px; padding: 0 8px; margin-top: 2px; }
+.galnote { font-size: 15px; color: var(--muted); }
+.seg { flex: none; display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: none; background: var(--surface); color: var(--muted); font-size: 13.5px; font-weight: 600; padding: 6px 10px; min-width: 52px; }
+.seg button + button { border-inline-start: 1px solid var(--line); }
+.seg button[aria-pressed="true"][data-v="love"] { background: var(--accent); color: var(--surface); }
+.seg button[aria-pressed="true"][data-v="ok"] { background: var(--ok); color: var(--surface); }
+.seg button[aria-pressed="true"][data-v="no"] { background: var(--no); color: var(--surface); }
+
+/* Questions */
+.questions { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: grid; gap: 18px; }
+.q { display: grid; gap: 8px; }
+.q > label, .q > .qlabel { font-weight: 600; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border: 1px solid var(--line); background: var(--bg); color: var(--fg); border-radius: 999px; padding: 6px 14px; font-size: 15px; }
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.q textarea { width: 100%; min-height: 70px; font: inherit; font-size: 15px; padding: 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+
+.send { padding-block: 0 40px; display: grid; gap: 10px; justify-items: start; }
+.send p { color: var(--muted); max-width: 60ch; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (max-width: 420px) {
+  .seg button { min-width: 46px; padding: 6px 8px; }
+  .items { grid-template-columns: 1fr; }
+  .bar .btn { padding: 8px 12px; font-size: 14px; }
+  .counts { gap: 8px; }
+}
+</style>
+
+<div class="wrap intro">
+  <h1>מה את מוכנה לאכול?</h1>
+  <p class="lede">רשימה של דברים שיש בכל סופר בישראל. לכל אחד מסמנים אם את אוהבת אותו, אוכלת אותו בלי בעיה, או לא אוכלת בכלל. אין תשובות נכונות. לפי זה נבנה תפריט רק ממה שאת באמת אוהבת.</p>
+  <div class="legend">
+    <span><i class="dot love"></i> אוהבת: שמחה לאכול את זה הרבה</span>
+    <span><i class="dot ok"></i> בסדר: אוכלת, לא מתלהבת</span>
+    <span><i class="dot no"></i> לא: לא בתפריט שלי</span>
+  </div>
+  <p class="galnote"><span class="galtag">גם בתפריט של גל</span> מסמן מאכלים שכבר נמצאים בתפריט של גל. כל מה שמשותף אפשר לקנות ולבשל ביחד.</p>
+</div>
+
+<div class="bar">
+  <div class="wrap">
+    <div class="progress">
+      <div class="row"><span><b id="doneNum">0</b> מתוך <span id="totalNum">0</span> סומנו</span>
+        <span class="counts"><span><i class="dot love"></i><span id="cLove">0</span></span><span><i class="dot ok"></i><span id="cOk">0</span></span><span><i class="dot no"></i><span id="cNo">0</span></span></span></div>
+      <div class="track"><div class="fill" id="fill"></div></div>
+    </div>
+    <button class="btn" id="copyTop" type="button">העתקת התשובות</button>
+  </div>
+</div>
+
+<main class="wrap" id="groups"></main>
+
+<div class="wrap" style="padding-bottom:26px">
+  <div class="questions">
+    <h2>כמה שאלות קצרות</h2>
+    <div class="q"><span class="qlabel" id="q-hungry">מתי את הכי רעבה? (אפשר לבחור כמה)</span><div class="chips" data-q="hungry" data-multi="1" role="group" aria-labelledby="q-hungry"></div></div>
+    <div class="q"><span class="qlabel" id="q-taste">מה יותר קשה לך: מתוק או מלוח?</span><div class="chips" data-q="taste" role="group" aria-labelledby="q-taste"></div></div>
+    <div class="q"><span class="qlabel" id="q-lunch">איפה את אוכלת צהריים ברוב הימים?</span><div class="chips" data-q="lunch" role="group" aria-labelledby="q-lunch"></div></div>
+    <div class="q"><span class="qlabel" id="q-cook">כמה זמן יש לך לבשל ארוחת ערב?</span><div class="chips" data-q="cook" role="group" aria-labelledby="q-cook"></div></div>
+    <div class="q"><label for="t-extra">משהו שאת אוהבת ולא מופיע ברשימה?</label><textarea id="t-extra" data-t="extra" placeholder="למשל: סביח, ממולאים של אמא, יוגורט מסוים..."></textarea></div>
+    <div class="q"><label for="t-hard">על מה הכי קשה לך לוותר?</label><textarea id="t-hard" data-t="hard" placeholder="למשל: שוקולד בערב, פיצה ביום חמישי..."></textarea></div>
+  </div>
+</div>
+
+<div class="wrap send">
+  <h2>סיימת?</h2>
+  <p>לוחצים על הכפתור, והתשובות מועתקות כטקסט. שולחים אותן בוואטסאפ, וזהו. התשובות נשמרות במכשיר הזה, אז אפשר גם לעצור ולחזור אחר כך.</p>
+  <button class="btn" id="copyBottom" type="button">העתקת התשובות</button>
+  <div class="copybox" id="copyBox" hidden>
+    <label class="muted" for="copyText">ההעתקה לא עבדה כאן. סמני את הטקסט והעתיקי אותו.</label>
+    <textarea id="copyText" readonly></textarea>
+  </div>
+  <button class="btn ghost" id="resetBtn" type="button">ניקוי כל התשובות</button>
+  <p id="resetConfirm" hidden>בטוחה? <button class="btn ghost" id="resetYes" type="button">כן, לנקות</button> <button class="btn ghost" id="resetNo" type="button">ביטול</button></p>
+</div>
+
+<script>
+const GROUPS = [
+  { id: "meat", title: "עוף, בשר ודגים", items: [
+    "חזה עוף", "פרגיות", "שניצל עוף (אפוי)", "שווארמה עוף / הודו", "חזה הודו", "פסטרמה הודו / חזה עוף פרוס",
+    "בקר טחון (קציצות, בולונז)", "סטייק", "קבב", "סלמון", "אמנון / מושט", "דניס / לברק",
+    "טונה בקופסה", "סרדינים", "שרימפס / פירות ים"
+  ]},
+  { id: "dairy", title: "ביצים ומוצרי חלב", items: [
+    "ביצים", "חלבוני ביצה (רק הלבן)", "קוטג׳", "יוגורט יווני", "יוגורט חלבון (PRO, GO וכו׳)",
+    "גבינה לבנה", "בולגרית / צפתית 5%", "לבנה", "גבינה צהובה 9%", "מוצרלה", "פודינג חלבון",
+    "שוקו / משקה חלבון", "אבקת חלבון (שייק)", "חלב", "משקה שקדים / סויה"
+  ]},
+  { id: "plant", title: "חלבון מהצומח", items: [
+    "טופו", "עדשים", "גרגרי חומוס", "שעועית לבנה / אדומה", "אדממה", "שניצל / המבורגר צמחי"
+  ]},
+  { id: "carbs", title: "לחם, דגנים ופחמימות", items: [
+    "שיבולת שועל", "לחם מלא / כוסמין / שיפון", "לחם קל (פרוסות דקות)", "פיתה", "טורטייה", "לחמנייה",
+    "פריכיות אורז / תירס", "קרקרים", "אורז לבן", "אורז מלא", "קינואה", "בורגול",
+    "פתיתים", "קוסקוס", "פסטה", "תפוחי אדמה", "בטטה", "תירס", "גרנולה"
+  ]},
+  { id: "veg", title: "ירקות", hint: "לרוב הירקות כמעט אין קלוריות, אז מה שתסמני כאן נוכל להוסיף כמעט בלי הגבלה.", items: [
+    "עגבניות / שרי", "מלפפונים", "פלפלים", "חסה / עלים ירוקים", "ברוקולי", "כרובית", "קישואים", "חצילים",
+    "גזר", "בצל", "פטריות", "תרד", "שעועית ירוקה", "כרוב", "סלק", "אפונה", "דלעת"
+  ]},
+  { id: "fruit", title: "פירות", items: [
+    "תפוח", "בננה", "תפוז / קלמנטינה", "פירות יער", "תותים", "ענבים", "אבטיח", "מלון",
+    "אגס", "קיווי", "מנגו", "אפרסק / נקטרינה", "רימון", "תמרים"
+  ]},
+  { id: "fats", title: "שומנים ותוספות", hint: "בריאים, אבל הרבה קלוריות בכמות קטנה, אז נשתמש בהם במידה.", items: [
+    "אבוקדו", "טחינה", "חמאת בוטנים", "שקדים / אגוזים", "זיתים", "שמן זית", "ממרח חומוס", "גרעינים", "שוקולד מריר"
+  ]},
+  { id: "dishes", title: "מנות ובישולים", items: [
+    "שקשוקה", "סלט ישראלי", "סלטים מוכנים (מטבוחה, חציל וכו׳)", "מרק עדשים / ירקות", "מרק עוף", "מג׳דרה", "עוף בתנור עם ירקות",
+    "קציצות ברוטב", "פסטה ברוטב עגבניות", "מוקפץ", "סלט טונה", "סושי", "שווארמה בצלחת"
+  ]},
+  { id: "snacks", title: "נשנושים ומתוקים", items: [
+    "חטיף חלבון", "חטיף דגנים", "פופקורן", "במבה", "בייגלה", "ארטיק / גלידה לייט",
+    "יוגורט עם גרנולה", "ירקות חתוכים עם מטבל", "שוקולד חלב / ממתקים"
+  ]},
+  { id: "drinks", title: "שתייה", items: [
+    "קפה עם חלב", "תה", "סודה / מים מוגזים", "משקאות זירו", "מים בטעמים בלי סוכר"
+  ]}
+];
+const QUESTIONS = {
+  hungry: ["בוקר", "צהריים", "אחר הצהריים", "ערב", "לילה"],
+  taste: ["מתוק", "מלוח", "שניהם", "אף אחד"],
+  lunch: ["בעבודה, מביאה מהבית", "בעבודה, קונה / חדר אוכל", "בבית"],
+  cook: ["5 דקות", "15 דקות", "30 דקות", "מבשלת פעם בשבוע לכמה ימים"]
+};
+const LABELS = { love: "אוהבת", ok: "בסדר", no: "לא" };
+const GAL_EATS = new Set([
+  "חזה עוף", "ביצים", "חלבוני ביצה (רק הלבן)", "יוגורט חלבון (PRO, GO וכו׳)", "אבקת חלבון (שייק)",
+  "שיבולת שועל", "לחם מלא / כוסמין / שיפון", "בטטה", "גרנולה",
+  "עגבניות / שרי", "מלפפונים", "פלפלים", "ברוקולי",
+  "תפוח", "בננה", "אבוקדו", "סלט ישראלי"
+]);
+const STORE_KEY = "food-survey-v1";
+
+let state = { a: {}, q: {}, t: {} };
+try { const raw = localStorage.getItem(STORE_KEY); if (raw) state = Object.assign(state, JSON.parse(raw)); } catch (e) {}
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} }
+
+const keyOf = (g, name) => g.id + ":" + name;
+const total = GROUPS.reduce((n, g) => n + g.items.length, 0);
+
+function renderGroups() {
+  document.getElementById("groups").innerHTML = GROUPS.map(g => `
+    <section class="group" aria-labelledby="g-${g.id}">
+      <header>
+        <h2 id="g-${g.id}">${g.title}</h2>
+        <button class="allok" type="button" data-allok="${g.id}">סמני את הנותרים כ״בסדר״</button>
+        ${g.hint ? `<p class="hint">${g.hint}</p>` : ""}
+      </header>
+      <div class="items">
+        ${g.items.map(name => {
+          const k = keyOf(g, name);
+          return `<div class="item" data-k="${k}">
+            <span class="name">${name}${GAL_EATS.has(name) ? `<br><span class="galtag">גם בתפריט של גל</span>` : ""}</span>
+            <span class="seg" role="group" aria-label="${name}">
+              ${["love", "ok", "no"].map(v => `<button type="button" data-k="${k}" data-v="${v}" aria-pressed="false">${LABELS[v]}</button>`).join("")}
+            </span>
+          </div>`;
+        }).join("")}
+      </div>
+    </section>`).join("");
+}
+
+function renderQuestions() {
+  document.querySelectorAll(".chips").forEach(box => {
+    const q = box.dataset.q;
+    box.innerHTML = QUESTIONS[q].map(opt => `<button type="button" class="chip" data-opt="${opt}" aria-pressed="false">${opt}</button>`).join("");
+  });
+  document.querySelectorAll("textarea[data-t]").forEach(ta => { ta.value = state.t[ta.dataset.t] || ""; });
+}
+
+function sync() {
+  document.querySelectorAll(".item").forEach(row => {
+    const v = state.a[row.dataset.k] || "";
+    row.dataset.v = v;
+    row.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === v)));
+  });
+  document.querySelectorAll(".chips").forEach(box => {
+    const sel = state.q[box.dataset.q] || [];
+    box.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", String(sel.includes(c.dataset.opt))));
+  });
+  const vals = [];
+  GROUPS.forEach(g => g.items.forEach(name => { const v = state.a[keyOf(g, name)]; if (v) vals.push(v); }));
+  const done = vals.length;
+  document.getElementById("doneNum").textContent = done;
+  document.getElementById("totalNum").textContent = total;
+  document.getElementById("cLove").textContent = vals.filter(v => v === "love").length;
+  document.getElementById("cOk").textContent = vals.filter(v => v === "ok").length;
+  document.getElementById("cNo").textContent = vals.filter(v => v === "no").length;
+  document.getElementById("fill").style.width = (done / total * 100) + "%";
+}
+
+document.getElementById("groups").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.allok) {
+    const g = GROUPS.find(x => x.id === b.dataset.allok);
+    g.items.forEach(name => { const k = keyOf(g, name); if (!state.a[k]) state.a[k] = "ok"; });
+  } else if (b.dataset.k) {
+    if (state.a[b.dataset.k] === b.dataset.v) delete state.a[b.dataset.k];
+    else state.a[b.dataset.k] = b.dataset.v;
+  } else return;
+  save(); sync();
+});
+
+document.querySelector(".questions").addEventListener("click", e => {
+  const c = e.target.closest(".chip");
+  if (!c) return;
+  const box = c.closest(".chips");
+  const q = box.dataset.q, opt = c.dataset.opt;
+  let sel = state.q[q] || [];
+  if (box.dataset.multi) sel = sel.includes(opt) ? sel.filter(x => x !== opt) : sel.concat(opt);
+  else sel = sel.includes(opt) ? [] : [opt];
+  state.q[q] = sel;
+  save(); sync();
+});
+let tTimer;
+document.querySelector(".questions").addEventListener("input", e => {
+  const ta = e.target.closest("textarea[data-t]");
+  if (!ta) return;
+  state.t[ta.dataset.t] = ta.value;
+  clearTimeout(tTimer); tTimer = setTimeout(save, 400);
+});
+document.querySelector(".questions").addEventListener("change", () => { clearTimeout(tTimer); save(); });
+
+function summary() {
+  const by = { love: [], ok: [], no: [] };
+  const missing = [];
+  GROUPS.forEach(g => g.items.forEach(name => {
+    const v = state.a[keyOf(g, name)];
+    if (v) by[v].push(name); else missing.push(name);
+  }));
+  const qText = (label, q) => `${label}: ${(state.q[q] || []).join(", ") || "-"}`;
+  const lines = [
+    "התשובות שלי לרשימת האוכל",
+    "",
+    `אוהבת (${by.love.length}): ${by.love.join(", ") || "-"}`,
+    "",
+    `בסדר (${by.ok.length}): ${by.ok.join(", ") || "-"}`,
+    "",
+    `לא (${by.no.length}): ${by.no.join(", ") || "-"}`,
+    "",
+    missing.length ? `לא סימנתי (${missing.length}): ${missing.join(", ")}` : "סימנתי הכל",
+    "",
+    qText("הכי רעבה", "hungry"),
+    qText("יותר קשה לי", "taste"),
+    qText("צהריים", "lunch"),
+    qText("זמן לבשל ערב", "cook"),
+    `עוד דברים שאני אוהבת: ${(state.t.extra || "").trim() || "-"}`,
+    `הכי קשה לוותר על: ${(state.t.hard || "").trim() || "-"}`
+  ];
+  return lines.join("\n");
+}
+
+function copyAnswers(btn) {
+  clearTimeout(tTimer); save();
+  const text = summary();
+  const box = document.getElementById("copyBox");
+  const fallback = () => {
+    box.hidden = false;
+    const ta = document.getElementById("copyText");
+    ta.value = text; ta.focus(); ta.select();
+    box.scrollIntoView({ block: "center" });
+  };
+  try {
+    navigator.clipboard.writeText(text).then(() => {
+      box.hidden = true;
+      clearTimeout(btn._t);
+      btn.textContent = "הועתק. אפשר להדביק בוואטסאפ";
+      btn._t = setTimeout(() => { btn.textContent = "העתקת התשובות"; }, 2200);
+    }).catch(fallback);
+  } catch (err) { fallback(); }
+}
+document.getElementById("copyTop").addEventListener("click", e => copyAnswers(e.currentTarget));
+document.getElementById("copyBottom").addEventListener("click", e => copyAnswers(e.currentTarget));
+
+document.getElementById("resetBtn").addEventListener("click", () => { document.getElementById("resetConfirm").hidden = false; });
+document.getElementById("resetNo").addEventListener("click", () => { document.getElementById("resetConfirm").hidden = true; });
+document.getElementById("resetYes").addEventListener("click", () => {
+  state = { a: {}, q: {}, t: {} };
+  save(); renderQuestions(); sync();
+  document.getElementById("resetConfirm").hidden = true;
+});
+
+renderGroups();
+renderQuestions();
+sync();
+</script>
+
+</body>
+</html>
